@@ -85,23 +85,38 @@ class ProjectMemory:
         indexed_files = dict(cursor.fetchall())
         
         current_files = set()
+        MAX_FILES = 5000
+        file_count = 0
         
         # Walk directory
         for root, dirs, files in os.walk(self.workspace):
-            # Exclude folders
-            if ".ulolm" in root or ".git" in root or "__pycache__" in root or "node_modules" in root:
-                continue
+            if file_count >= MAX_FILES:
+                break
+                
+            # Properly exclude folders by modifying dirs in-place
+            ignored_dirs = {"__pycache__", "node_modules", "venv", "env", "AppData", "Library", "target", "build", "dist"}
+            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ignored_dirs]
                 
             for filename in files:
+                if file_count >= MAX_FILES:
+                    break
+                
+                file_count += 1
                 file_path = Path(root) / filename
                 rel_path = str(file_path.relative_to(self.workspace))
                 current_files.add(rel_path)
                 
                 # Check modification stats
                 try:
-                    mtime = file_path.stat().st_mtime
-                    with open(file_path, 'rb') as f:
-                        file_hash = hashlib.sha256(f.read()).hexdigest()
+                    stats = file_path.stat()
+                    mtime = stats.st_mtime
+                    
+                    # Skip hashing files larger than 5MB to prevent massive hangs
+                    if stats.st_size > 5 * 1024 * 1024:
+                        file_hash = f"large_file_skipped_{mtime}"
+                    else:
+                        with open(file_path, 'rb') as f:
+                            file_hash = hashlib.sha256(f.read()).hexdigest()
                 except Exception:
                     continue
                 
@@ -132,6 +147,43 @@ class ProjectMemory:
         conn.commit()
         conn.close()
         return modified_files
+
+    def search_context(self, query: str, heuristic_engine) -> str:
+        """
+        Uses the HeuristicEngine to score all files in the database against the query.
+        Returns the content summary of the most relevant files.
+        """
+        if not self.db_path.exists():
+            return ""
+            
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT filepath, content_summary FROM files")
+        all_files = cursor.fetchall()
+        conn.close()
+        
+        # Score each file based on the query using the heuristic engine
+        scored_files = []
+        for filepath, content in all_files:
+            # We score the filepath and the content
+            text_to_score = f"{filepath} {content}"
+            score = heuristic_engine.score_context(query, text_to_score)
+            if score > 0:
+                scored_files.append((score, filepath, content))
+                
+        if not scored_files:
+            return ""
+            
+        # Sort by highest score first
+        scored_files.sort(reverse=True, key=lambda x: x[0])
+        
+        # Take top 3 files to build the context
+        best_context = []
+        for score, fp, content in scored_files[:3]:
+            best_context.append(f"File: {fp}\nRelevance Score: {score:.2f}\nSnippet:\n{content}")
+            
+        return "\n\n".join(best_context)
 
     def _parse_python_symbols(self, cursor: sqlite3.Cursor, full_path: Path, rel_path: str):
         """Extracts class and function definitions from python files using AST parser."""

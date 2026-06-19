@@ -5,7 +5,7 @@ from pathlib import Path
 class Config:
     def __init__(self):
         self.active_model = "UloLMBase"
-        self.backend = "mock"  # Options: mock, ollama, openai, gemini
+        self.backend = "native"  # Options: native, ollama, openai, gemini
         self.ollama_url = "http://localhost:11434"
         self.openai_api_key = os.environ.get("OPENAI_API_KEY", "")
         self.openai_base_url = "https://api.openai.com/v1"
