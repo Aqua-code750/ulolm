@@ -56,14 +56,10 @@ def main():
     router = ExpertRouter()
     engine = ModelEngine(config)
     
-    # Initial scan of codebase
-    if HAS_RICH:
-        with console.status("[cyan]Scanning workspace files and indexing symbols...", spinner="dots"):
-            memory.scan_and_sync()
-    else:
-        print("Scanning workspace files and indexing symbols...")
-        memory.scan_and_sync()
-        
+    # Initial scan of codebase removed to prevent blocking on large directories.
+    # Users can manually trigger a scan with `/scan`
+    if not memory.db_path.exists():
+        memory.initialize()
     print_banner(config)
     
     while True:
@@ -116,16 +112,29 @@ def main():
                 "UloLM CLI Commands:\n"
                 "  /info           - Displays project state and indexed symbols database\n"
                 "  /config <k> <v> - Modifies configuration (e.g. /config backend ollama)\n"
+                "  /scan           - Manually triggers a workspace scan to update the index\n"
                 "  /help           - Displays this menu\n"
                 "  /exit           - Closes the application"
             )
             print(help_text)
             continue
             
-        # 1. Sync file system modifications before inference
-        modified = memory.scan_and_sync()
-        if modified and HAS_RICH:
-            console.print(f"[dim]Index Sync: detected {len(modified)} file changes.[/dim]")
+        if user_input == "/scan":
+            if HAS_RICH:
+                with console.status("[cyan]Scanning workspace files and indexing symbols...", spinner="dots"):
+                    modified = memory.scan_and_sync()
+            else:
+                print("Scanning workspace files and indexing symbols...")
+                modified = memory.scan_and_sync()
+                
+            if HAS_RICH:
+                console.print(f"[dim]Index Sync complete. Detected {len(modified)} file changes.[/dim]")
+            else:
+                print(f"Index Sync complete. Detected {len(modified)} file changes.")
+            continue
+            
+        # 1. Sync file system modifications before inference (REMOVED)
+        # We now rely on the user to run /scan manually, or auto-sync after writes.
             
         # 2. Expert Routing
         expert = router.route(user_input)
