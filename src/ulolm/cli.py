@@ -136,7 +136,19 @@ def main():
             
         # 3. Model Query with injected workspace memory
         project_context = memory.get_project_context()
-        system_context = f"{expert.system_prompt}\n\n{project_context}"
+        tool_instructions = (
+            "\n\nAVAILABLE TOOLS:\n"
+            "You have access to the following tools. To execute a tool, output a JSON block formatted exactly like this:\n"
+            "```json\n"
+            "[\n"
+            "  {\n"
+            "    \"name\": \"write_file\",\n"
+            "    \"parameters\": {\"path\": \"relative/path/to/file.py\", \"content\": \"new file contents\"}\n"
+            "  }\n"
+            "]\n"
+            "```\n"
+        )
+        system_context = f"{expert.system_prompt}\n\n{project_context}{tool_instructions}"
         
         response = None
         if HAS_RICH:

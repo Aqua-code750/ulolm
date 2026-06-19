@@ -13,7 +13,8 @@ class HeuristicEngine:
         # Basic intent signatures
         self.intent_signatures = {
             "GREETING": r"\b(hi|hello|hey|yo|greetings|morning|evening|wassup)\b",
-            "CODE_EXPLANATION": r"\b(explain|how does|what is|how to|break down|walk me through|summarize)\b",
+            "KNOWLEDGE_QUERY": r"\b(who is|what is|tell me about|when did|how did|history of|explain the concept of)\b",
+            "CODE_EXPLANATION": r"\b(explain|how does|how to|break down|walk me through|summarize)\b",
             "DEBUG_ERROR": r"\b(error|bug|fix|crash|exception|traceback|failed|why is it failing)\b",
             "PROJECT_SUMMARY": r"\b(summarize project|what is this project|overview|architecture|stack)\b",
             "REFACTOR_CODE": r"\b(refactor|clean up|optimize|improve|rewrite|format)\b"
@@ -86,6 +87,9 @@ class HeuristicEngine:
         elif intent == "CODE_EXPLANATION":
             response += "[HEURISTIC ENGINE]: Analyzing query for explanation requests. Extracting relevant entities...\n"
             response += "Based on my pure-Python indexing, here is what I understand about your request:\n\n"
+        elif intent == "KNOWLEDGE_QUERY":
+            response += "[CLOUD HEURISTIC]: Initiating dynamic web knowledge retrieval sequence...\n"
+            response += "I've queried the global knowledge base. Here is the compiled intelligence:\n\n"
         elif intent == "DEBUG_ERROR":
             response += "[HEURISTIC ENGINE]: Error signature detected. Scanning local index for potential faults...\n"
             response += "I've analyzed the potential failure points using my heuristic matrix. Here's a breakdown:\n\n"

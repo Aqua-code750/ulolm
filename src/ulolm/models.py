@@ -29,7 +29,7 @@ class ModelEngine:
 
     def _query_ollama(self, prompt: str, system_context: str) -> ModelResponse:
         url = f"{self.config.ollama_url}/api/chat"
-        model_name = "llama3" if self.config.active_model == "UloLMBase" else "phi3"
+        model_name = "codellama" if self.config.active_model == "UloLMBase" else "phi3"
         payload = {"model": model_name, "messages": [
             {"role": "system", "content": system_context},
             {"role": "user", "content": prompt}
@@ -101,6 +101,26 @@ class ModelEngine:
             return ModelResponse(f"Gemini API Error: {e.code} - {e.read().decode('utf-8')}")
         except Exception as e:
             return ModelResponse(f"Gemini query failed: {e}")
+
+    def _parse_response(self, text: str) -> ModelResponse:
+        import re
+        import json
+        tools = []
+        json_blocks = re.findall(r'```(?:json)?\s*([\s\S]*?)```', text)
+        for block in json_blocks:
+            try:
+                data = json.loads(block)
+                if isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict) and "name" in item:
+                            tools.append(item)
+                elif isinstance(data, dict) and "name" in data:
+                    tools.append(data)
+                elif isinstance(data, dict) and "tools_to_call" in data:
+                    tools.extend(data["tools_to_call"])
+            except Exception:
+                pass
+        return ModelResponse(text, tools)
 
     def _pc(self, system_context: str) -> dict:
         """Parse context from system_context string."""
@@ -185,6 +205,23 @@ class ModelEngine:
         # 2. Extract context using TF-IDF mathematical scoring
         memory = ProjectMemory(self.config.workspace_path)
         context_str = memory.search_context(prompt, engine)
+        
+        # 2.5 Dynamic Cloud Retrieval
+        if intent == "KNOWLEDGE_QUERY" or intent == "GENERAL_CHAT":
+            # Extract the core topic to search
+            import re
+            topic = prompt
+            topic_match = re.search(r'(?:who is|what is|tell me about|when did|how did|history of|explain the concept of)\s+(.*)', prompt.lower())
+            if topic_match:
+                topic = topic_match.group(1).strip('? ')
+            else:
+                topic = " ".join(engine.tokenize(prompt))
+                
+            if topic:
+                wiki_data = self._search_wikipedia(topic)
+                if wiki_data:
+                    context_str = wiki_data + "\n\n" + context_str
+                    intent = "KNOWLEDGE_QUERY" # Upgrade intent if we found data
         
         # 3. Synthesize the final heuristic response
         response_text = engine.synthesize_response(intent, prompt, context_str)

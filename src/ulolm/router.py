@@ -57,6 +57,15 @@ class ExpertRouter:
                     "You are UloLM's Design Expert. Focus on color theory, premium styling, clean responsive grids, "
                     "glassmorphism effects, CSS transitions, and visual layout harmony."
                 )
+            ),
+            "General": ExpertProfile(
+                name="General Chat Expert",
+                description="Friendly AI assistant for casual conversation and general queries.",
+                system_prompt=(
+                    "You are UloLM's General Chat Expert. You are friendly, helpful, and conversational. "
+                    "Engage in casual talk, answer general knowledge questions, and assist the user "
+                    "with topics outside of coding or technical domains."
+                )
             )
         }
         
@@ -83,6 +92,10 @@ class ExpertRouter:
         # Research
         if any(x in p_low for x in ["explain how", "search", "lookup", "documentation of", "what is"]):
             return self.experts["Research"]
+            
+        # General / Casual Talk
+        if any(x in p_low for x in ["hello", "hi", "hey", "how are you", "what's up", "who are you", "chat", "casual"]):
+            return self.experts["General"]
             
         # Coding (Default developer fallback)
         return self.experts["Coding"]
