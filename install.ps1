@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 $installDir = "$env:LOCALAPPDATA\UloLM"
 $exePath = "$installDir\ulolm.exe"
-$downloadUrl = "https://github.com/Aqua-code750/ulolm/releases/download/v1.0.0/ulolm.exe"
+$downloadUrl = "https://github.com/Aqua-code750/ulolm/releases/download/v3.0.0/ulolm.exe"
 
 Write-Host "Installing UloLM..." -ForegroundColor Cyan
 
@@ -11,7 +11,7 @@ if (-not (Test-Path -Path $installDir)) {
 }
 
 # Download the executable
-Write-Host "Downloading UloLM (v1.0.0) from GitHub..."
+Write-Host "Downloading UloLM (v3.0.0) from GitHub..."
 Invoke-WebRequest -Uri $downloadUrl -OutFile $exePath
 
 # Update PATH

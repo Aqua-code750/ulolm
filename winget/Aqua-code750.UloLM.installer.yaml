@@ -1,11 +1,11 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
 PackageIdentifier: Aqua-code750.UloLM
-PackageVersion: 1.0.0
+PackageVersion: 3.0.0
 InstallerType: portable
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/Aqua-code750/ulolm/releases/download/v1.0.0/ulolm.exe
-    InstallerSha256: b2b3e69656651cfd2110f4afe5bb5ba2b3ede48c82405aef7e3437f618b1f759
+    InstallerUrl: https://github.com/Aqua-code750/ulolm/releases/download/v3.0.0/ulolm.exe
+    InstallerSha256: ae6c3fb2bb8a4b5b3353c70b65b0c23ee403781c41097c58f7d2ac693f9e5064
     Commands:
       - ulolm
 ManifestType: installer

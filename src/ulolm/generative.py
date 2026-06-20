@@ -100,9 +100,129 @@ class GenerativeEngine:
         except Exception as e:
             return False, f"Failed to load model: {e}"
 
-    def train_on_workspace(self, epochs: int = 0, max_tokens: int = 0):
-        """Downloads and caches the selected native model."""
-        success, msg = self._load_model(allow_download=True)
+    def _fetch_download_url(self) -> tuple:
+        """Fetch the download URL and filesize for the current model from models3.json."""
+        import urllib.request
+        import json
+        
+        filename = self.model_filename
+        try:
+            req = urllib.request.Request(
+                "https://gpt4all.io/models/models3.json",
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                for model in data:
+                    if model.get("filename") == filename:
+                        url = model.get("url")
+                        size = int(model.get("filesize", 0)) if model.get("filesize") else None
+                        return url, size
+        except Exception:
+            pass
+            
+        # Fallback URL if models3.json lookup fails
+        fallback_url = f"https://gpt4all.io/models/gguf/{filename}"
+        return fallback_url, None
+
+    def download_model_file(self, progress_callback=None) -> tuple:
+        """Downloads the current model file with resume support and retries."""
+        import urllib.request
+        import time
+        
+        dest_path = self.model_dir / self.model_filename
+        if dest_path.exists():
+            return True, "Model file already exists."
+            
+        url, expected_size = self._fetch_download_url()
+        temp_path = dest_path.with_suffix(".part")
+        
+        retries = 5
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        }
+        
+        for attempt in range(retries):
+            try:
+                downloaded = 0
+                if temp_path.exists():
+                    downloaded = temp_path.stat().st_size
+                    if expected_size and downloaded >= expected_size:
+                        try:
+                            temp_path.rename(dest_path)
+                            return True, "Model downloaded successfully."
+                        except Exception:
+                            pass
+                    headers["Range"] = f"bytes={downloaded}-"
+                
+                req = urllib.request.Request(url, headers=headers)
+                
+                try:
+                    response = urllib.request.urlopen(req, timeout=20)
+                    status_code = response.getcode()
+                except urllib.error.HTTPError as e:
+                    if e.code == 416:  # Range not satisfiable (might be fully downloaded)
+                        try:
+                            temp_path.rename(dest_path)
+                            return True, "Model downloaded successfully."
+                        except Exception:
+                            pass
+                        return True, "Model downloaded successfully."
+                    raise e
+                
+                # Check if resuming
+                is_resume = (status_code == 206)
+                if not is_resume:
+                    downloaded = 0
+                    write_mode = "wb"
+                else:
+                    write_mode = "ab"
+                    
+                total_size = expected_size
+                content_len = response.headers.get("Content-Length")
+                if content_len:
+                    if is_resume:
+                        total_size = downloaded + int(content_len)
+                    else:
+                        total_size = int(content_len)
+                
+                chunk_size = 1024 * 1024  # 1MB chunks
+                
+                # Create directory if not exists
+                self.model_dir.mkdir(parents=True, exist_ok=True)
+                
+                with open(temp_path, write_mode) as f:
+                    while True:
+                        chunk = response.read(chunk_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if progress_callback:
+                            try:
+                                progress_callback(downloaded, total_size)
+                            except Exception:
+                                pass
+                            
+                # Rename to final file
+                if temp_path.exists():
+                    temp_path.rename(dest_path)
+                return True, "Model downloaded successfully."
+                
+            except (ConnectionResetError, ConnectionAbortedError, urllib.error.URLError, TimeoutError, OSError) as e:
+                if attempt == retries - 1:
+                    return False, f"Failed after {retries} attempts. Last error: {e}"
+                time.sleep(2 ** attempt)  # Backoff: 1s, 2s, 4s, 8s...
+                
+        return False, "Failed to download model due to connection issues."
+
+    def train_on_workspace(self, progress_callback=None):
+        """Downloads the selected native model and loads it."""
+        success, msg = self.download_model_file(progress_callback=progress_callback)
+        if not success:
+            return False, msg
+            
+        success, msg = self._load_model(allow_download=False)
         if success:
             self._save_selected_model(self.model_key)
             info = self.model_info

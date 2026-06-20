@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
 PackageIdentifier: Aqua-code750.UloLM
-PackageVersion: 1.0.0
+PackageVersion: 3.0.0
 PackageLocale: en-US
 Publisher: Aqua-code750
 PackageName: UloLM

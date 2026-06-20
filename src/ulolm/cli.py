@@ -137,16 +137,50 @@ def main():
             from ulolm.generative import GenerativeEngine
             gen_engine = GenerativeEngine(config.workspace_path)
             model_name = gen_engine.model_info['name']
+            
             if HAS_RICH:
-                with console.status(f"[cyan]Downloading {model_name}...", spinner="dots"):
-                    success, msg = gen_engine.train_on_workspace()
+                from rich.progress import Progress, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn, TextColumn
+                
+                progress = Progress(
+                    TextColumn("[bold cyan]{task.description}"),
+                    BarColumn(),
+                    DownloadColumn(),
+                    TransferSpeedColumn(),
+                    TimeRemainingColumn(),
+                    transient=True
+                )
+                
+                with progress:
+                    task = progress.add_task(f"Downloading {model_name}...", total=None)
+                    
+                    def cb(downloaded, total):
+                        if total:
+                            progress.update(task, completed=downloaded, total=total)
+                        else:
+                            progress.update(task, completed=downloaded)
+                            
+                    success, msg = gen_engine.train_on_workspace(progress_callback=cb)
+                
                 if success:
                     console.print(f"[bold green]✔ {msg}[/bold green]")
                 else:
                     console.print(f"[bold red]✖ {msg}[/bold red]")
             else:
                 print(f"Downloading {model_name}...")
-                success, msg = gen_engine.train_on_workspace()
+                last_pct = -1
+                
+                def cb(downloaded, total):
+                    nonlocal last_pct
+                    if total:
+                        pct = int((downloaded / total) * 100)
+                        if pct % 5 == 0 and pct != last_pct:
+                            print(f"Progress: {pct}% ({downloaded // (1024*1024)}MB / {total // (1024*1024)}MB)")
+                            last_pct = pct
+                    else:
+                        if downloaded % (10 * 1024 * 1024) == 0:
+                            print(f"Downloaded: {downloaded // (1024*1024)}MB")
+                            
+                success, msg = gen_engine.train_on_workspace(progress_callback=cb)
                 print(f"{'✔' if success else '✖'} {msg}")
             continue
 
