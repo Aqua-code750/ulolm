@@ -101,7 +101,7 @@ def main():
             
         if user_input == "/train_gen":
             if HAS_RICH:
-                with console.status("[cyan]Training Native Generative AI on workspace files...", spinner="dots"):
+                with console.status("[cyan]Downloading and initializing native AI model (Phi-3)...", spinner="dots"):
                     from ulolm.generative import GenerativeEngine
                     gen_engine = GenerativeEngine(config.workspace_path)
                     success, msg = gen_engine.train_on_workspace()
@@ -110,7 +110,7 @@ def main():
                 else:
                     console.print(f"[bold red]✖ {msg}[/bold red]")
             else:
-                print("Training Native Generative AI on workspace files...")
+                print("Downloading and initializing native AI model (Phi-3)...")
                 from ulolm.generative import GenerativeEngine
                 gen_engine = GenerativeEngine(config.workspace_path)
                 success, msg = gen_engine.train_on_workspace()
@@ -144,7 +144,7 @@ def main():
                 "  /info           - Displays project state and indexed symbols database\n"
                 "  /config <k> <v> - Modifies configuration (e.g. /config backend ollama)\n"
                 "  /train <i> <t>  - Teaches the local heuristic model a new intent (e.g. /train GREETING hello)\n"
-                "  /train_gen      - Trains the native PyTorch generative LSTM on your local workspace files\n"
+                "  /train_gen      - Downloads and initializes the native Phi-3 AI model for local inference\n"
                 "  /scan           - Manually triggers a workspace scan to update the index\n"
                 "  /help           - Displays this menu\n"
                 "  /exit           - Closes the application"

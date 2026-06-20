@@ -234,24 +234,16 @@ class ModelEngine:
             return ""
 
     # ─────────────────────────────────────────────────────────────
-    # Mock Engine — Full Conversational AI
+    # Native Engine — GPT4All Local Inference
     # ─────────────────────────────────────────────────────────────
 
     def _query_native(self, prompt: str, system_context: str) -> ModelResponse:
         from .generative import GenerativeEngine
         
-        # Initialize the true native generative engine
+        # Initialize the native GPT4All generative engine
         engine = GenerativeEngine(self.config.workspace_path)
         
-        # Generate text natively
-        response_text = engine.generate(prompt, length=300)
+        # Generate text natively using local Phi-3 weights
+        response_text = engine.generate(prompt, length=500, system_context=system_context)
         
-        # Add the native disclaimer
-        final_text = (
-            "[NATIVE PYTORCH GENERATOR]: Executing autoregressive text generation using local LSTM weights...\n\n"
-            f"{response_text}\n\n"
-            "---\n"
-            "*(This text was generated natively character-by-character by an AI trained on your computer!)*"
-        )
-        
-        return ModelResponse(final_text, [])
+        return self._parse_response(response_text)

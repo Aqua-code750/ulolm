@@ -1,60 +1,170 @@
-# UloLM - Universal Local & Cloud AI Platform 🚀
+# UloLM
 
-UloLM is a next-generation local and cloud-based AI environment combining the ease-of-use of a standard chatbot interface, the power of multi-agent workspace routing, and the local execution capabilities of an operating system sandbox. 
+**A fully native, offline AI assistant that runs entirely on your machine.**
 
-Recently updated to feature a completely custom, lightweight **PyTorch Neural Engine**, UloLM is designed to be blazingly fast and run natively entirely on your local hardware.
+UloLM is a local-first AI platform that combines expert routing, workspace-aware context injection, and a state-of-the-art language model — all running natively without cloud APIs. It uses [GPT4All](https://gpt4all.io) to load quantized transformer models directly into your process, giving you GPT-class intelligence with zero network dependency.
 
 ---
 
-## ⚡ Installation (The Fast Way)
+## Features
 
-You can install the complete PyTorch-powered executable in a single command on any Windows machine:
+- **100% Local Inference** — No API keys required. No data ever leaves your machine.
+- **Expert Routing** — Automatically dispatches your query to a specialized expert (Coding, Math, Game Dev, Design, Research, Writing) using a lightweight intent classifier.
+- **Workspace Memory** — Indexes your project files and symbols (AST-parsed), then injects relevant context into the model prompt via BM25 retrieval.
+- **Tool Execution** — The model can generate file-write tool calls, which are executed locally with a security gatekeeper.
+- **Multi-Backend Support** — Optionally connect to Ollama, OpenAI, or Gemini APIs if you want cloud-augmented responses.
+
+---
+
+## Quick Start
+
+### Option 1: One-Line Install (Windows)
 
 ```powershell
 irm https://raw.githubusercontent.com/Aqua-code750/ulolm/main/install.ps1 | iex
 ```
 
-Once installed, simply type `ulolm` in your terminal from absolutely anywhere to launch the AI workspace.
+This installs `ulolm.exe` to your PATH. Then from any directory:
 
-## 📦 Installation (Python / Source)
-
-If you prefer building from source or running it as a Python module:
-
-1. Clone the repository
-2. Install the lightweight requirements:
-```bash
-pip install -r requirements.txt
 ```
-3. Run the CLI natively:
+ulolm
+```
+
+### Option 2: From Source
+
 ```bash
+git clone https://github.com/Aqua-code750/ulolm.git
+cd ulolm
+pip install -r requirements.txt
 python main.py
 ```
 
-## 🧠 PyTorch Heuristic Engine
+### First Run
 
-Our expert router utilizes a highly optimized `EmbeddingBag` MLP built entirely on CPU-optimized PyTorch. It dynamically routes your requests to the correct expert system (Game Dev, Mathematics, Python Coding, etc.) in milliseconds, completely offline.
+On first launch, run the following command inside UloLM to download the local AI model (~2.3 GB, one-time):
 
----
+```
+/train_gen
+```
 
-## 🏗️ Architectural Specifications
-
-All requested architectural blueprints, design sheets, roadmaps, and security policies are stored in the `/docs/` folder:
-
-1. **[System Architecture](docs/system_architecture.md)**: Details runtime layers, components, folder structure, technology stack, and component lifecycle diagrams.
-2. **[Project Memory System](docs/memory_system.md)**: Outlines workspace index database schemas (SQLite), AST symbol parsers, architectural metadata templates (`project_state.json`), and context prompt injection routines.
-3. **[Model Family & Architecture](docs/model_architecture.md)**: Defines parameters, network design features (Grouped-Query Attention, SwiGLU FFN), context lengths, local model hardware targets (Nano, Mini, Base), and speculative decoding settings.
-
-## 🎮 Example Workflows
-
-Since UloLM runs natively via its lightweight PyTorch engine, you can trigger its core agent capabilities immediately without configuring any API keys:
-
-### 1. Create a Game Project
-Type: `create a pygame shooter game` or `initialize a 2D platformer game`.
-* **Action**: The **Expert Router** routes the request to `GameDevelopment` and `Coding` experts.
-* **Security Gatekeeper**: Prompts approval for files.
-* **Workspace Executor**: Creates a fully working Pygame sprite game inside the workspace (`src/main.py`), a `requirements.txt`, and a `.ulolm/project_state.json` locking in project rules.
+Once downloaded, the model is cached locally in `.ulolm/` and loads instantly on subsequent launches.
 
 ---
 
-> **Support Open Source!**
-> If you like lightweight local AI tools, consider leaving a ⭐ on the repository!
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `/train_gen` | Download and initialize the native Phi-3 model |
+| `/scan` | Re-index workspace files and symbols |
+| `/info` | Display project state and indexed symbols |
+| `/config <key> <value>` | Update configuration (backend, model, API keys) |
+| `/train <INTENT> <text>` | Teach the intent classifier a new pattern |
+| `/help` | Show all available commands |
+| `/exit` | Exit UloLM |
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│                   CLI (cli.py)                   │
+│          Rich terminal UI + REPL loop            │
+├─────────────────────────────────────────────────┤
+│              Expert Router (router.py)            │
+│   Keyword-based dispatch to domain experts       │
+├─────────────────────────────────────────────────┤
+│             Model Engine (models.py)              │
+│  native | ollama | openai | gemini | combined    │
+├──────────────────┬──────────────────────────────┤
+│  GPT4All Native  │   Heuristic Engine            │
+│  (generative.py) │   (heuristic.py)              │
+│  Phi-3 GGUF      │   EmbeddingBag MLP + BM25     │
+├──────────────────┴──────────────────────────────┤
+│           Workspace Memory (memory.py)            │
+│     SQLite index · AST parser · BM25 search      │
+├─────────────────────────────────────────────────┤
+│          Workspace Executor (executor.py)          │
+│        Sandboxed file write operations            │
+└─────────────────────────────────────────────────┘
+```
+
+### Key Components
+
+- **`generative.py`** — Loads a quantized Phi-3 model via GPT4All for native inference. No wrappers, no HTTP servers — the model runs in-process.
+- **`heuristic.py`** — A lightweight PyTorch EmbeddingBag MLP for intent classification, plus a BM25 scoring engine for local document retrieval.
+- **`router.py`** — Routes user queries to specialized expert profiles (Coding, Math, Game Dev, Design, Research, Writing, General).
+- **`memory.py`** — SQLite-backed workspace index with Python AST symbol extraction. Provides contextual project information to the model.
+- **`executor.py`** — Executes tool calls (file writes) generated by the model, scoped to the active workspace.
+
+---
+
+## Configuration
+
+UloLM reads configuration from (in priority order):
+
+1. `.ulolm/config.json` in the current workspace
+2. Environment variables (`ULOLM_BACKEND`, `ULOLM_MODEL`, `OPENAI_API_KEY`, `GEMINI_API_KEY`)
+3. `.env` file in the current directory
+
+### Backends
+
+| Backend | Description |
+|---------|-------------|
+| `native` | Default. Runs Phi-3 locally via GPT4All. No network required. |
+| `ollama` | Connects to a local Ollama server (CodeLlama / Phi-3). |
+| `openai` | Uses OpenAI API (requires `OPENAI_API_KEY`). |
+| `gemini` | Uses Google Gemini API (requires `GEMINI_API_KEY`). |
+| `combined` | Multi-model: drafts with Gemini, refines with OpenAI. |
+
+---
+
+## Building the Executable
+
+```bash
+pip install pyinstaller
+pyinstaller --onefile --name ulolm --collect-all gpt4all src/ulolm/cli.py
+```
+
+The compiled binary will be in `dist/ulolm.exe`.
+
+---
+
+## Project Structure
+
+```
+ulolm/
+├── src/ulolm/
+│   ├── cli.py          # Terminal REPL and command handler
+│   ├── config.py       # Configuration loader (.env, JSON, env vars)
+│   ├── generative.py   # GPT4All native inference engine
+│   ├── heuristic.py    # Intent classifier + BM25 retrieval
+│   ├── models.py       # Multi-backend model dispatcher
+│   ├── memory.py       # SQLite workspace index + AST parser
+│   ├── router.py       # Expert routing system
+│   └── executor.py     # Sandboxed file write executor
+├── data.md             # Training corpus and knowledge base
+├── docs/               # Architecture and design documentation
+├── main.py             # Entry point
+├── requirements.txt
+└── install.ps1         # One-line Windows installer
+```
+
+---
+
+## Requirements
+
+- Python 3.10+
+- Windows 10/11 (primary target), Linux/macOS (untested)
+- ~2.5 GB disk space for the Phi-3 model weights
+
+---
+
+## License
+
+MIT
+
+---
+
+> Built with local-first principles. Your data never leaves your machine.
