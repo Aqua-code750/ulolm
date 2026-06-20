@@ -99,7 +99,25 @@ def main():
                 print("Usage: /config <backend|model|gemini_api_key|openai_api_key> <value>")
             continue
             
-        if user_input.startswith("/train"):
+        if user_input == "/train_gen":
+            if HAS_RICH:
+                with console.status("[cyan]Training Native Generative AI on workspace files...", spinner="dots"):
+                    from .generative import GenerativeEngine
+                    gen_engine = GenerativeEngine(config.workspace_path)
+                    success, msg = gen_engine.train_on_workspace()
+                if success:
+                    console.print(f"[bold green]✔ {msg}[/bold green]")
+                else:
+                    console.print(f"[bold red]✖ {msg}[/bold red]")
+            else:
+                print("Training Native Generative AI on workspace files...")
+                from .generative import GenerativeEngine
+                gen_engine = GenerativeEngine(config.workspace_path)
+                success, msg = gen_engine.train_on_workspace()
+                print(f"{'✔' if success else '✖'} {msg}")
+            continue
+
+        if user_input.startswith("/train "):
             parts = user_input.split(maxsplit=2)
             if len(parts) == 3:
                 intent, text = parts[1].upper(), parts[2]
@@ -125,7 +143,8 @@ def main():
                 "UloLM CLI Commands:\n"
                 "  /info           - Displays project state and indexed symbols database\n"
                 "  /config <k> <v> - Modifies configuration (e.g. /config backend ollama)\n"
-                "  /train <i> <t>  - Teaches the local AI a new intent (e.g. /train GREETING hello)\n"
+                "  /train <i> <t>  - Teaches the local heuristic model a new intent (e.g. /train GREETING hello)\n"
+                "  /train_gen      - Trains the native PyTorch generative LSTM on your local workspace files\n"
                 "  /scan           - Manually triggers a workspace scan to update the index\n"
                 "  /help           - Displays this menu\n"
                 "  /exit           - Closes the application"

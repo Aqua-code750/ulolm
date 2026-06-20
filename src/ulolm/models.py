@@ -252,37 +252,20 @@ class ModelEngine:
     # ─────────────────────────────────────────────────────────────
 
     def _query_native(self, prompt: str, system_context: str) -> ModelResponse:
-        from .memory import ProjectMemory
+        from .generative import GenerativeEngine
         
-        memory = ProjectMemory(self.config.workspace_path)
-        # Initialize the heuristic engine
-        engine = HeuristicEngine()
-        engine.load_training_data(memory.get_training_data())
+        # Initialize the true native generative engine
+        engine = GenerativeEngine(self.config.workspace_path)
         
-        # 1. Identify Intent
-        intent = engine.identify_intent(prompt)
+        # Generate text natively
+        response_text = engine.generate(prompt, length=300)
         
-        # 2. Extract context using BM25 mathematical scoring
-        context_str = memory.search_context(prompt, engine)
+        # Add the native disclaimer
+        final_text = (
+            "[NATIVE PYTORCH GENERATOR]: Executing autoregressive text generation using local LSTM weights...\n\n"
+            f"{response_text}\n\n"
+            "---\n"
+            "*(This text was generated natively character-by-character by an AI trained on your computer!)*"
+        )
         
-        # 2.5 Dynamic Cloud Retrieval
-        if intent == "KNOWLEDGE_QUERY" or intent == "GENERAL_CHAT":
-            # Extract the core topic to search
-            import re
-            topic = prompt
-            topic_match = re.search(r'(?:who is|what is|tell me about|when did|how did|history of|explain the concept of)\s+(.*)', prompt.lower())
-            if topic_match:
-                topic = topic_match.group(1).strip('? ')
-            else:
-                topic = " ".join(engine.tokenize(prompt))
-                
-            if topic:
-                wiki_data = self._search_wikipedia(topic)
-                if wiki_data:
-                    context_str = wiki_data + "\n\n" + context_str
-                    intent = "KNOWLEDGE_QUERY" # Upgrade intent if we found data
-        
-        # 3. Synthesize the final heuristic response
-        response_text = engine.synthesize_response(intent, prompt, context_str)
-        
-        return ModelResponse(response_text, [])
+        return ModelResponse(final_text, [])
