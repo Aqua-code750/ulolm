@@ -99,20 +99,53 @@ def main():
                 print("Usage: /config <backend|model|gemini_api_key|openai_api_key> <value>")
             continue
             
-        if user_input == "/train_gen":
+        if user_input == "/models":
+            from ulolm.generative import AVAILABLE_MODELS, GenerativeEngine
+            gen = GenerativeEngine(config.workspace_path)
+            current = gen.model_key
             if HAS_RICH:
-                with console.status("[cyan]Downloading and initializing native AI model (Phi-3)...", spinner="dots"):
-                    from ulolm.generative import GenerativeEngine
-                    gen_engine = GenerativeEngine(config.workspace_path)
+                console.print("\n[bold cyan]Available Native Models (UloLlama)[/bold cyan]")
+                console.print(f"[dim]{'Key':<20} {'Name':<35} {'RAM':<8}[/dim]")
+                console.print("[dim]" + "─" * 63 + "[/dim]")
+                for key, info in AVAILABLE_MODELS.items():
+                    marker = " [green]◀ active[/green]" if key == current else ""
+                    console.print(f"  [yellow]{key:<20}[/yellow] {info['name']:<35} [dim]{info['ram']:<8}[/dim]{marker}")
+                console.print(f"\n[dim]Switch with:[/dim] /model <key>")
+            else:
+                print("\nAvailable Native Models (UloLlama)")
+                for key, info in AVAILABLE_MODELS.items():
+                    marker = " <-- active" if key == current else ""
+                    print(f"  {key:<20} {info['name']:<35} {info['ram']:<8}{marker}")
+                print(f"\nSwitch with: /model <key>")
+            continue
+
+        if user_input.startswith("/model "):
+            model_key = user_input.split(maxsplit=1)[1].strip()
+            from ulolm.generative import GenerativeEngine
+            gen = GenerativeEngine(config.workspace_path)
+            success, msg = gen.set_model(model_key)
+            if HAS_RICH:
+                if success:
+                    console.print(f"[bold green]✔ {msg}[/bold green]")
+                else:
+                    console.print(f"[bold red]✖ {msg}[/bold red]")
+            else:
+                print(f"{'✔' if success else '✖'} {msg}")
+            continue
+
+        if user_input == "/train_gen":
+            from ulolm.generative import GenerativeEngine
+            gen_engine = GenerativeEngine(config.workspace_path)
+            model_name = gen_engine.model_info['name']
+            if HAS_RICH:
+                with console.status(f"[cyan]Downloading {model_name}...", spinner="dots"):
                     success, msg = gen_engine.train_on_workspace()
                 if success:
                     console.print(f"[bold green]✔ {msg}[/bold green]")
                 else:
                     console.print(f"[bold red]✖ {msg}[/bold red]")
             else:
-                print("Downloading and initializing native AI model (Phi-3)...")
-                from ulolm.generative import GenerativeEngine
-                gen_engine = GenerativeEngine(config.workspace_path)
+                print(f"Downloading {model_name}...")
                 success, msg = gen_engine.train_on_workspace()
                 print(f"{'✔' if success else '✖'} {msg}")
             continue
@@ -141,11 +174,13 @@ def main():
         if user_input == "/help":
             help_text = (
                 "UloLM CLI Commands:\n"
-                "  /info           - Displays project state and indexed symbols database\n"
-                "  /config <k> <v> - Modifies configuration (e.g. /config backend ollama)\n"
-                "  /train <i> <t>  - Teaches the local heuristic model a new intent (e.g. /train GREETING hello)\n"
-                "  /train_gen      - Downloads and initializes the native Phi-3 AI model for local inference\n"
-                "  /scan           - Manually triggers a workspace scan to update the index\n"
+                "  /models         - Lists all available native AI models\n"
+                "  /model <key>    - Switches the active native model (e.g. /model deepseek-r1-7b)\n"
+                "  /train_gen      - Downloads and initializes the selected native model\n"
+                "  /info           - Displays project state and indexed symbols\n"
+                "  /config <k> <v> - Modifies configuration (e.g. /config backend native)\n"
+                "  /train <i> <t>  - Teaches the intent classifier a new pattern\n"
+                "  /scan           - Re-indexes workspace files and symbols\n"
                 "  /help           - Displays this menu\n"
                 "  /exit           - Closes the application"
             )

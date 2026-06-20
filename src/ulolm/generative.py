@@ -8,71 +8,124 @@ try:
 except ImportError:
     HAS_GPT4ALL = False
 
+# All available models from the GPT4All catalog
+AVAILABLE_MODELS = {
+    # ── Lightweight (2-4 GB RAM) ──
+    "llama-3.2-1b":     {"file": "Llama-3.2-1B-Instruct-Q4_0.gguf",       "ram": "2 GB",  "name": "Llama 3.2 1B Instruct"},
+    "llama-3.2-3b":     {"file": "Llama-3.2-3B-Instruct-Q4_0.gguf",       "ram": "4 GB",  "name": "Llama 3.2 3B Instruct"},
+    "phi-3-mini":       {"file": "Phi-3-mini-4k-instruct.Q4_0.gguf",      "ram": "4 GB",  "name": "Phi-3 Mini Instruct"},
+    "deepseek-r1-1.5b": {"file": "DeepSeek-R1-Distill-Qwen-1.5B-Q4_0.gguf","ram": "3 GB", "name": "DeepSeek R1 1.5B"},
+    "mini-orca":        {"file": "orca-mini-3b-gguf2-q4_0.gguf",          "ram": "4 GB",  "name": "Mini Orca 3B"},
+    "qwen2-1.5b":       {"file": "qwen2-1_5b-instruct-q4_0.gguf",         "ram": "3 GB",  "name": "Qwen2 1.5B Instruct"},
+    # ── Medium (8 GB RAM) ──
+    "llama-3-8b":       {"file": "Meta-Llama-3-8B-Instruct.Q4_0.gguf",    "ram": "8 GB",  "name": "Llama 3 8B Instruct"},
+    "llama-3.1-8b":     {"file": "Meta-Llama-3.1-8B-Instruct-128k-Q4_0.gguf","ram": "8 GB","name": "Llama 3.1 8B 128k"},
+    "deepseek-r1-7b":   {"file": "DeepSeek-R1-Distill-Qwen-7B-Q4_0.gguf", "ram": "8 GB", "name": "DeepSeek R1 7B"},
+    "deepseek-r1-8b":   {"file": "DeepSeek-R1-Distill-Llama-8B-Q4_0.gguf","ram": "8 GB",  "name": "DeepSeek R1 8B"},
+    "mistral-7b":       {"file": "mistral-7b-instruct-v0.1.Q4_0.gguf",    "ram": "8 GB",  "name": "Mistral 7B Instruct"},
+    "mistral-openorca":  {"file": "mistral-7b-openorca.gguf2.Q4_0.gguf",  "ram": "8 GB",  "name": "Mistral OpenOrca"},
+    "hermes-2-mistral":  {"file": "Nous-Hermes-2-Mistral-7B-DPO.Q4_0.gguf","ram": "8 GB", "name": "Nous Hermes 2 Mistral"},
+    "ghost-7b":          {"file": "ghost-7b-v0.9.1-Q4_0.gguf",            "ram": "8 GB",  "name": "Ghost 7B"},
+    "orca-2-7b":         {"file": "orca-2-7b.Q4_0.gguf",                  "ram": "8 GB",  "name": "Orca 2 Medium"},
+    "reasoner-v1":       {"file": "qwen2.5-coder-7b-instruct-q4_0.gguf",  "ram": "8 GB",  "name": "Qwen 2.5 Coder 7B"},
+    # ── Heavy (16 GB RAM) ──
+    "deepseek-r1-14b":  {"file": "DeepSeek-R1-Distill-Qwen-14B-Q4_0.gguf","ram": "16 GB", "name": "DeepSeek R1 14B"},
+    "orca-2-13b":       {"file": "orca-2-13b.Q4_0.gguf",                  "ram": "16 GB", "name": "Orca 2 Full"},
+    "wizard-13b":       {"file": "wizardlm-13b-v1.2.Q4_0.gguf",           "ram": "16 GB", "name": "Wizard v1.2"},
+    "hermes-13b":       {"file": "nous-hermes-llama2-13b.Q4_0.gguf",      "ram": "16 GB", "name": "Hermes 13B"},
+    # ── Code-Specific ──
+    "starcoder":        {"file": "starcoder-newbpe-q4_0.gguf",            "ram": "4 GB",  "name": "StarCoder"},
+    "replit":           {"file": "replit-code-v1_5-3b-newbpe-q4_0.gguf",  "ram": "4 GB",  "name": "Replit Code 3B"},
+    "rift-coder":       {"file": "rift-coder-v0-7b-q4_0.gguf",            "ram": "8 GB",  "name": "Rift Coder 7B"},
+}
+
+DEFAULT_MODEL_KEY = "llama-3.2-3b"
+
+
 class GenerativeEngine:
-    def __init__(self, workspace_path: str):
+    def __init__(self, workspace_path: str, model_key: str = None):
         self.workspace_path = workspace_path
-        # We store models locally in the workspace .ulolm directory so it's portable
         self.model_dir = Path(workspace_path) / ".ulolm"
         self.model_dir.mkdir(parents=True, exist_ok=True)
-        self.model_name = "Llama-3.2-3B-Instruct-Q4_0.gguf"
-        self.model_path = self.model_dir / self.model_name
+        self.model_key = model_key or self._load_selected_model() or DEFAULT_MODEL_KEY
         self.model = None
+
+    def _load_selected_model(self) -> str:
+        """Read the user's selected model from .ulolm/native_model.txt"""
+        model_file = self.model_dir / "native_model.txt"
+        if model_file.exists():
+            key = model_file.read_text(encoding="utf-8").strip()
+            if key in AVAILABLE_MODELS:
+                return key
+        return ""
+
+    def _save_selected_model(self, key: str):
+        """Persist the user's model choice."""
+        model_file = self.model_dir / "native_model.txt"
+        model_file.write_text(key, encoding="utf-8")
+
+    @property
+    def model_info(self) -> dict:
+        return AVAILABLE_MODELS.get(self.model_key, AVAILABLE_MODELS[DEFAULT_MODEL_KEY])
+
+    @property
+    def model_filename(self) -> str:
+        return self.model_info["file"]
+
+    def set_model(self, key: str) -> tuple:
+        """Switch the active native model."""
+        if key not in AVAILABLE_MODELS:
+            return False, f"Unknown model '{key}'. Run /models to see available options."
+        self.model_key = key
+        self.model = None  # Force reload on next generate
+        self._save_selected_model(key)
+        info = AVAILABLE_MODELS[key]
+        return True, f"Switched native model to {info['name']} ({info['ram']} RAM required)"
 
     def _load_model(self, allow_download=False):
         if not HAS_GPT4ALL:
             return False, "gpt4all module is not installed."
-        
-        # Check if model exists
-        if not self.model_path.exists() and not allow_download:
-            return False, f"Model file {self.model_name} not found in {self.model_dir}. Please run `/train_gen` first to download the weights."
+
+        model_path = self.model_dir / self.model_filename
+        if not model_path.exists() and not allow_download:
+            return False, f"Model {self.model_filename} not found. Run `/train_gen` to download it."
 
         try:
-            # Load or download the model
             self.model = GPT4All(
-                model_name=self.model_name,
+                model_name=self.model_filename,
                 model_path=str(self.model_dir),
                 allow_download=allow_download
             )
             return True, "Model loaded successfully."
         except Exception as e:
-            return False, f"Failed to load GPT4All model: {e}"
+            return False, f"Failed to load model: {e}"
 
     def train_on_workspace(self, epochs: int = 0, max_tokens: int = 0):
-        """
-        Since we upgraded to a pre-trained GPT4All model (Phi-3),
-        'training' now downloads and caches the state-of-the-art model natively.
-        """
+        """Downloads and caches the selected native model."""
         success, msg = self._load_model(allow_download=True)
         if success:
-            return True, f"Successfully initialized and verified local native model: {self.model_name}"
+            self._save_selected_model(self.model_key)
+            info = self.model_info
+            return True, f"Successfully initialized {info['name']} ({info['ram']} RAM) — model cached locally."
         else:
             return False, msg
 
     def generate(self, prompt: str, length: int = 500, temperature: float = 0.3, system_context: str = "") -> str:
         """Generates text natively using the GPT4All model with optional system context."""
         if not HAS_GPT4ALL:
-            return (
-                "GPT4All is not installed! "
-                "Please ensure the dependencies are installed."
-            )
-            
+            return "GPT4All is not installed! Please ensure the dependencies are installed."
+
         if self.model is None:
             success, msg = self._load_model(allow_download=False)
             if not success:
-                return (
-                    "Native Generative Model weights not found! "
-                    "Please run `/train_gen` first to download and initialize the AI."
-                )
+                return "Native model not found! Please run `/train_gen` first to download it."
 
-        # Generate response using the local model
         try:
-            # Build system prompt — use expert context if provided, otherwise default
             if system_context:
                 system_prompt = system_context
             else:
                 system_prompt = "You are UloLM, a highly capable native AI running entirely locally. Be extremely helpful and concise."
-            
-            # Use the chat session to keep the formatting appropriate for the model
+
             with self.model.chat_session(system_prompt=system_prompt):
                 response = self.model.generate(
                     prompt,
@@ -82,4 +135,3 @@ class GenerativeEngine:
             return response.strip()
         except Exception as e:
             return f"Error during native generation: {e}"
-
