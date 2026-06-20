@@ -41,20 +41,6 @@ class ModelEngine:
         
         context_str = memory.search_context(prompt, engine)
         
-        if intent == "KNOWLEDGE_QUERY" or intent == "GENERAL_CHAT":
-            import re
-            topic = prompt
-            topic_match = re.search(r'(?:who is|what is|tell me about|when did|how did|history of|explain the concept of)\s+(.*)', prompt.lower())
-            if topic_match:
-                topic = topic_match.group(1).strip('? ')
-            else:
-                topic = " ".join(engine.tokenize(prompt))
-                
-            if topic:
-                wiki_data = self._search_wikipedia(topic)
-                if wiki_data:
-                    context_str = wiki_data + "\n\n" + context_str
-        
         # Inject the retrieved context into the system_context
         if context_str and len(context_str.strip()) > 10:
             enhanced_system_context = f"{system_context}\n\nADDITIONAL HEURISTIC CONTEXT:\n{context_str}"

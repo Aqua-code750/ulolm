@@ -102,7 +102,7 @@ def main():
         if user_input == "/train_gen":
             if HAS_RICH:
                 with console.status("[cyan]Training Native Generative AI on workspace files...", spinner="dots"):
-                    from .generative import GenerativeEngine
+                    from ulolm.generative import GenerativeEngine
                     gen_engine = GenerativeEngine(config.workspace_path)
                     success, msg = gen_engine.train_on_workspace()
                 if success:
@@ -111,7 +111,7 @@ def main():
                     console.print(f"[bold red]✖ {msg}[/bold red]")
             else:
                 print("Training Native Generative AI on workspace files...")
-                from .generative import GenerativeEngine
+                from ulolm.generative import GenerativeEngine
                 gen_engine = GenerativeEngine(config.workspace_path)
                 success, msg = gen_engine.train_on_workspace()
                 print(f"{'✔' if success else '✖'} {msg}")
