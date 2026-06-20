@@ -150,7 +150,7 @@ class ProjectMemory:
 
     def search_context(self, query: str, heuristic_engine) -> str:
         """
-        Uses the HeuristicEngine to score all files in the database against the query.
+        Uses the HeuristicEngine's BM25 algorithm to score all files in the database against the query.
         Returns the content summary of the most relevant files.
         """
         if not self.db_path.exists():
@@ -163,21 +163,14 @@ class ProjectMemory:
         all_files = cursor.fetchall()
         conn.close()
         
-        # Score each file based on the query using the heuristic engine
-        scored_files = []
-        for filepath, content in all_files:
-            # We score the filepath and the content
-            text_to_score = f"{filepath} {content}"
-            score = heuristic_engine.score_context(query, text_to_score)
-            if score > 0:
-                scored_files.append((score, filepath, content))
+        # Prepare documents for BM25: list of (id, filepath, content)
+        documents = [(i, fp, content) for i, (fp, content) in enumerate(all_files)]
+        
+        scored_files = heuristic_engine.score_corpus_bm25(query, documents)
                 
         if not scored_files:
             return ""
             
-        # Sort by highest score first
-        scored_files.sort(reverse=True, key=lambda x: x[0])
-        
         # Take top 3 files to build the context
         best_context = []
         for score, fp, content in scored_files[:3]:
@@ -260,3 +253,25 @@ class ProjectMemory:
         context.append("============================")
         
         return "\n".join(context)
+
+    def get_training_data(self) -> List[Dict[str, str]]:
+        """Loads custom training data for the heuristic engine."""
+        data_path = self.ulolm_dir / "training_data.json"
+        if not data_path.exists():
+            return []
+        try:
+            with open(data_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return []
+            
+    def save_training_example(self, intent: str, text: str):
+        """Saves a new training example for the heuristic engine."""
+        self.ulolm_dir.mkdir(parents=True, exist_ok=True)
+        data_path = self.ulolm_dir / "training_data.json"
+        
+        dataset = self.get_training_data()
+        dataset.append({"intent": intent, "text": text})
+        
+        with open(data_path, 'w', encoding='utf-8') as f:
+            json.dump(dataset, f, indent=4)

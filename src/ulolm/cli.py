@@ -99,6 +99,19 @@ def main():
                 print("Usage: /config <backend|model|gemini_api_key|openai_api_key> <value>")
             continue
             
+        if user_input.startswith("/train"):
+            parts = user_input.split(maxsplit=2)
+            if len(parts) == 3:
+                intent, text = parts[1].upper(), parts[2]
+                memory.save_training_example(intent, text)
+                if HAS_RICH:
+                    console.print(f"[bold green]✔ Successfully trained local model:[/bold green] '{text}' -> {intent}")
+                else:
+                    print(f"✔ Successfully trained local model: '{text}' -> {intent}")
+            else:
+                print("Usage: /train <INTENT> <example prompt text>")
+            continue
+            
         if user_input == "/info":
             context = memory.get_project_context()
             if HAS_RICH:
@@ -112,6 +125,7 @@ def main():
                 "UloLM CLI Commands:\n"
                 "  /info           - Displays project state and indexed symbols database\n"
                 "  /config <k> <v> - Modifies configuration (e.g. /config backend ollama)\n"
+                "  /train <i> <t>  - Teaches the local AI a new intent (e.g. /train GREETING hello)\n"
                 "  /scan           - Manually triggers a workspace scan to update the index\n"
                 "  /help           - Displays this menu\n"
                 "  /exit           - Closes the application"

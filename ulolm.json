@@ -6,7 +6,7 @@
     "architecture": {
         "64bit": {
             "url": "https://github.com/Aqua-code750/ulolm/releases/download/v1.0.0/ulolm.exe",
-            "hash": "5DCDC857F5E3A16D57BF729FE76DD932E48E80BF3DBAAF72F52EF92711C9FF0F"
+            "hash": "35BFC0D31465FF69E4AF56E951A9BF315257676B7336ECDFBCE4B221DB7BBF3D"
         }
     },
     "bin": "ulolm.exe",

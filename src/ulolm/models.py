@@ -33,10 +33,12 @@ class ModelEngine:
         from .memory import ProjectMemory
         
         # --- EXTENSION 1 & 2: Heuristic Context & Wiki Retrieval ---
+        memory = ProjectMemory(self.config.workspace_path)
         engine = HeuristicEngine()
+        engine.load_training_data(memory.get_training_data())
+        
         intent = engine.identify_intent(prompt)
         
-        memory = ProjectMemory(self.config.workspace_path)
         context_str = memory.search_context(prompt, engine)
         
         if intent == "KNOWLEDGE_QUERY" or intent == "GENERAL_CHAT":
@@ -252,14 +254,15 @@ class ModelEngine:
     def _query_native(self, prompt: str, system_context: str) -> ModelResponse:
         from .memory import ProjectMemory
         
+        memory = ProjectMemory(self.config.workspace_path)
         # Initialize the heuristic engine
         engine = HeuristicEngine()
+        engine.load_training_data(memory.get_training_data())
         
         # 1. Identify Intent
         intent = engine.identify_intent(prompt)
         
-        # 2. Extract context using TF-IDF mathematical scoring
-        memory = ProjectMemory(self.config.workspace_path)
+        # 2. Extract context using BM25 mathematical scoring
         context_str = memory.search_context(prompt, engine)
         
         # 2.5 Dynamic Cloud Retrieval
