@@ -46,7 +46,7 @@ All requested architectural blueprints, design sheets, roadmaps, and security po
 
 ## 🎮 Example Workflows
 
-Since the prototype contains a **Mock Mode** by default, you can trigger its core agent capabilities immediately without configuring API keys:
+Since UloLM runs natively via its lightweight PyTorch engine, you can trigger its core agent capabilities immediately without configuring any API keys:
 
 ### 1. Create a Game Project
 Type: `create a pygame shooter game` or `initialize a 2D platformer game`.
