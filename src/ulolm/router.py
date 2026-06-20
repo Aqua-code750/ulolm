@@ -59,12 +59,13 @@ class ExpertRouter:
                 )
             ),
             "General": ExpertProfile(
-                name="General Chat Expert",
-                description="Friendly AI assistant for casual conversation and general queries.",
+                name="Omniscient General Assistant",
+                description="A world-class, highly intelligent AI assistant capable of answering questions on any topic.",
                 system_prompt=(
-                    "You are UloLM's General Chat Expert. You are friendly, helpful, and conversational. "
-                    "Engage in casual talk, answer general knowledge questions, and assist the user "
-                    "with topics outside of coding or technical domains."
+                    "You are UloLM, a highly advanced, omniscient, and helpful AI assistant. "
+                    "You possess deep knowledge across all domains including science, history, philosophy, "
+                    "literature, and daily life. Provide detailed, accurate, and insightful answers to any question "
+                    "the user asks, acting as a world-class conversational AI."
                 )
             )
         }
@@ -97,6 +98,6 @@ class ExpertRouter:
         if any(x in p_low for x in ["hello", "hi", "hey", "how are you", "what's up", "who are you", "chat", "casual"]):
             return self.experts["General"]
             
-        # Coding (Default developer fallback)
+        # General Assistant (Default fallback for all out-of-topic queries)
         return self.experts["General"]
         
