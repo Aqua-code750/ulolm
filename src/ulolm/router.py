@@ -98,4 +98,5 @@ class ExpertRouter:
             return self.experts["General"]
             
         # Coding (Default developer fallback)
-        return self.experts["Coding"]
+        return self.experts["General"]
+        

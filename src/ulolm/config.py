@@ -5,7 +5,7 @@ from pathlib import Path
 class Config:
     def __init__(self):
         self.active_model = "UloLMBase"
-        self.backend = "native"  # Options: native, ollama, openai, gemini
+        self.backend = "native"  # Options: native, ollama, openai, gemini, combined
         self.ollama_url = "http://localhost:11434"
         self.openai_api_key = os.environ.get("OPENAI_API_KEY", "")
         self.openai_base_url = "https://api.openai.com/v1"
@@ -44,6 +44,19 @@ class Config:
                 pass
         
         # Override with environment variables if present
+        # Parse local .env file natively if it exists
+        env_file = Path(os.getcwd()) / ".env"
+        if env_file.exists():
+            try:
+                with open(env_file, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#') and '=' in line:
+                            key, val = line.split('=', 1)
+                            os.environ[key.strip()] = val.strip()
+            except Exception:
+                pass
+
         self.backend = os.environ.get("ULOLM_BACKEND", self.backend)
         self.active_model = os.environ.get("ULOLM_MODEL", self.active_model)
         self.ollama_url = os.environ.get("OLLAMA_URL", self.ollama_url)

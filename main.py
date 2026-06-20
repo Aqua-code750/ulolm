@@ -9,10 +9,11 @@ if sys.stdout.encoding.lower() != 'utf-8':
     except Exception:
         pass
 
-# Resolve the local 'src' directory and add it to sys.path
-src_dir = Path(__file__).resolve().parent / "src"
-if str(src_dir) not in sys.path:
-    sys.path.insert(0, str(src_dir))
+# Resolve the local 'src' directory and add it to sys.path (if not frozen)
+if not getattr(sys, 'frozen', False):
+    src_dir = Path(__file__).resolve().parent / "src"
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
 
 from ulolm.cli import main
 
