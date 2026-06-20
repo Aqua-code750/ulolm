@@ -14,7 +14,7 @@ class GenerativeEngine:
         # We store models locally in the workspace .ulolm directory so it's portable
         self.model_dir = Path(workspace_path) / ".ulolm"
         self.model_dir.mkdir(parents=True, exist_ok=True)
-        self.model_name = "Phi-3-mini-4k-instruct-q4.gguf"
+        self.model_name = "Llama-3.2-3B-Instruct-Q4_0.gguf"
         self.model_path = self.model_dir / self.model_name
         self.model = None
 
