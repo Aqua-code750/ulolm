@@ -8,10 +8,10 @@ Recently updated to feature a completely custom, lightweight **PyTorch Neural En
 
 ## ⚡ Installation (The Fast Way)
 
-UloLM is officially distributed via **Scoop**, meaning you can install the complete PyTorch-powered executable in a single command on any Windows machine:
+You can install the complete PyTorch-powered executable in a single command on any Windows machine:
 
 ```powershell
-scoop install https://raw.githubusercontent.com/Aqua-code750/Extras/add-ulolm/bucket/ulolm.json
+irm https://raw.githubusercontent.com/Aqua-code750/ulolm/main/install.ps1 | iex
 ```
 
 Once installed, simply type `ulolm` in your terminal from absolutely anywhere to launch the AI workspace.
