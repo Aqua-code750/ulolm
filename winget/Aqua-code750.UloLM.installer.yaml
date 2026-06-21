@@ -5,7 +5,7 @@ InstallerType: portable
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/Aqua-code750/ulolm/releases/download/v3.0.0/ulolm.exe
-    InstallerSha256: 0f8b0c98c8c1ebc4c651d85287045429c41ee5155874605121614c7577a7f5b8
+    InstallerSha256: ae372265bbca001fda97915c6b8530b861523398eb6964a54f97beaca0f3c018
     Commands:
       - ulolm
 ManifestType: installer
