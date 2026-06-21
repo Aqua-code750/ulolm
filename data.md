@@ -320,3 +320,38 @@ A: Yes! If you type a query starting with "search" or "look up" (e.g., "search l
 
 ### Q: How do I train my own custom model here?
 A: You can train your local custom model (UloLlama) from scratch on your workspace data and data.md by typing `/train_gen` in the UloLM CLI. It will initialize a local training loop and output the training loss in real-time.
+
+---
+
+## Tool Calling & Advanced Actions
+
+### Q: Create a python script named test.py that prints hello
+A: I will create a script named test.py to print hello.
+```json
+[
+  {
+    "name": "write_file",
+    "parameters": {
+      "path": "test.py",
+      "content": "print('Hello from UloLM!')\n"
+    }
+  }
+]
+```
+
+### Q: Write a simple index.html file
+A: Sure, I can write index.html for you.
+```json
+[
+  {
+    "name": "write_file",
+    "parameters": {
+      "path": "index.html",
+      "content": "<!DOCTYPE html>\n<html>\n<head>\n  <title>UloLM Page</title>\n</head>\n<body>\n  <h1>Welcome to UloLM</h1>\n</body>\n</html>\n"
+    }
+  }
+]
+```
+
+### Q: How do you perform actions in the workspace?
+A: I generate JSON arrays containing tool call objects (e.g., name: "write_file" with parameters containing "path" and "content"). The CLI executor reads these outputs, prompts the user for verification, and executes the actions securely.
