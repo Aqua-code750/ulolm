@@ -1,46 +1,134 @@
 import os
 import sys
+import json
 from pathlib import Path
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-try:
-    from gpt4all import GPT4All
-    HAS_GPT4ALL = True
-except ImportError:
-    HAS_GPT4ALL = False
-
-# All available models from the GPT4All catalog
 AVAILABLE_MODELS = {
-    # ── Lightweight (2-4 GB RAM) ──
-    "llama-3.2-1b":     {"file": "Llama-3.2-1B-Instruct-Q4_0.gguf",       "ram": "2 GB",  "name": "Llama 3.2 1B Instruct"},
-    "llama-3.2-3b":     {"file": "Llama-3.2-3B-Instruct-Q4_0.gguf",       "ram": "4 GB",  "name": "Llama 3.2 3B Instruct"},
-    "phi-3-mini":       {"file": "Phi-3-mini-4k-instruct.Q4_0.gguf",      "ram": "4 GB",  "name": "Phi-3 Mini Instruct"},
-    "deepseek-r1-1.5b": {"file": "DeepSeek-R1-Distill-Qwen-1.5B-Q4_0.gguf","ram": "3 GB", "name": "DeepSeek R1 1.5B"},
-    "mini-orca":        {"file": "orca-mini-3b-gguf2-q4_0.gguf",          "ram": "4 GB",  "name": "Mini Orca 3B"},
-    "qwen2-1.5b":       {"file": "qwen2-1_5b-instruct-q4_0.gguf",         "ram": "3 GB",  "name": "Qwen2 1.5B Instruct"},
-    # ── Medium (8 GB RAM) ──
-    "llama-3-8b":       {"file": "Meta-Llama-3-8B-Instruct.Q4_0.gguf",    "ram": "8 GB",  "name": "Llama 3 8B Instruct"},
-    "llama-3.1-8b":     {"file": "Meta-Llama-3.1-8B-Instruct-128k-Q4_0.gguf","ram": "8 GB","name": "Llama 3.1 8B 128k"},
-    "deepseek-r1-7b":   {"file": "DeepSeek-R1-Distill-Qwen-7B-Q4_0.gguf", "ram": "8 GB", "name": "DeepSeek R1 7B"},
-    "deepseek-r1-8b":   {"file": "DeepSeek-R1-Distill-Llama-8B-Q4_0.gguf","ram": "8 GB",  "name": "DeepSeek R1 8B"},
-    "mistral-7b":       {"file": "mistral-7b-instruct-v0.1.Q4_0.gguf",    "ram": "8 GB",  "name": "Mistral 7B Instruct"},
-    "mistral-openorca":  {"file": "mistral-7b-openorca.gguf2.Q4_0.gguf",  "ram": "8 GB",  "name": "Mistral OpenOrca"},
-    "hermes-2-mistral":  {"file": "Nous-Hermes-2-Mistral-7B-DPO.Q4_0.gguf","ram": "8 GB", "name": "Nous Hermes 2 Mistral"},
-    "ghost-7b":          {"file": "ghost-7b-v0.9.1-Q4_0.gguf",            "ram": "8 GB",  "name": "Ghost 7B"},
-    "orca-2-7b":         {"file": "orca-2-7b.Q4_0.gguf",                  "ram": "8 GB",  "name": "Orca 2 Medium"},
-    "reasoner-v1":       {"file": "qwen2.5-coder-7b-instruct-q4_0.gguf",  "ram": "8 GB",  "name": "Qwen 2.5 Coder 7B"},
-    # ── Heavy (16 GB RAM) ──
-    "deepseek-r1-14b":  {"file": "DeepSeek-R1-Distill-Qwen-14B-Q4_0.gguf","ram": "16 GB", "name": "DeepSeek R1 14B"},
-    "orca-2-13b":       {"file": "orca-2-13b.Q4_0.gguf",                  "ram": "16 GB", "name": "Orca 2 Full"},
-    "wizard-13b":       {"file": "wizardlm-13b-v1.2.Q4_0.gguf",           "ram": "16 GB", "name": "Wizard v1.2"},
-    "hermes-13b":       {"file": "nous-hermes-llama2-13b.Q4_0.gguf",      "ram": "16 GB", "name": "Hermes 13B"},
-    # ── Code-Specific ──
-    "starcoder":        {"file": "starcoder-newbpe-q4_0.gguf",            "ram": "4 GB",  "name": "StarCoder"},
-    "replit":           {"file": "replit-code-v1_5-3b-newbpe-q4_0.gguf",  "ram": "4 GB",  "name": "Replit Code 3B"},
-    "rift-coder":       {"file": "rift-coder-v0-7b-q4_0.gguf",            "ram": "8 GB",  "name": "Rift Coder 7B"},
+    "ulollama": {"file": "ulollama.pt", "ram": "512 MB", "name": "UloLlama (Custom Tiny GPT)"}
 }
 
-DEFAULT_MODEL_KEY = "llama-3.2-3b"
+DEFAULT_MODEL_KEY = "ulollama"
 
+# ─────────────────────────────────────────────────────────────
+# Tiny GPT Model Architecture (Decoder-Only Transformer)
+# ─────────────────────────────────────────────────────────────
+
+class Head(nn.Module):
+    """ One head of self-attention """
+    def __init__(self, head_size, n_embd, block_size, dropout=0.1):
+        super().__init__()
+        self.key = nn.Linear(n_embd, head_size, bias=False)
+        self.query = nn.Linear(n_embd, head_size, bias=False)
+        self.value = nn.Linear(n_embd, head_size, bias=False)
+        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        B, T, C = x.shape
+        k = self.key(x)   # (B, T, head_size)
+        q = self.query(x) # (B, T, head_size)
+        # Compute attention scores
+        wei = q @ k.transpose(-2, -1) * (C**-0.5) # (B, T, head_size) @ (B, head_size, T) -> (B, T, T)
+        wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # (B, T, T)
+        wei = F.softmax(wei, dim=-1) # (B, T, T)
+        wei = self.dropout(wei)
+        # Perform weighted aggregation of values
+        v = self.value(x) # (B, T, head_size)
+        out = wei @ v # (B, T, T) @ (B, T, head_size) -> (B, T, head_size)
+        return out
+
+class MultiHeadAttention(nn.Module):
+    """ Multiple heads of self-attention in parallel """
+    def __init__(self, num_heads, head_size, n_embd, block_size, dropout=0.1):
+        super().__init__()
+        self.heads = nn.ModuleList([Head(head_size, n_embd, block_size, dropout) for _ in range(num_heads)])
+        self.proj = nn.Linear(n_embd, n_embd)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        out = torch.cat([h(x) for h in self.heads], dim=-1)
+        out = self.dropout(self.proj(out))
+        return out
+
+class FeedForward(nn.Module):
+    """ Simple linear layer followed by ReLU non-linearity """
+    def __init__(self, n_embd, dropout=0.1):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(n_embd, 4 * n_embd),
+            nn.ReLU(),
+            nn.Linear(4 * n_embd, n_embd),
+            nn.Dropout(dropout),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+class Block(nn.Module):
+    """ Transformer block: communication followed by computation """
+    def __init__(self, n_embd, n_head, block_size, dropout=0.1):
+        super().__init__()
+        head_size = n_embd // n_head
+        self.sa = MultiHeadAttention(n_head, head_size, n_embd, block_size, dropout)
+        self.ffwd = FeedForward(n_embd, dropout)
+        self.ln1 = nn.LayerNorm(n_embd)
+        self.ln2 = nn.LayerNorm(n_embd)
+
+    def forward(self, x):
+        x = x + self.sa(self.ln1(x))
+        x = x + self.ffwd(self.ln2(x))
+        return x
+
+class TinyGPT(nn.Module):
+    def __init__(self, vocab_size, n_embd=128, n_head=4, n_layer=3, block_size=64, dropout=0.1):
+        super().__init__()
+        self.block_size = block_size
+        self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
+        self.position_embedding_table = nn.Embedding(block_size, n_embd)
+        self.blocks = nn.Sequential(*[Block(n_embd, n_head, block_size, dropout) for _ in range(n_layer)])
+        self.ln_f = nn.LayerNorm(n_embd)
+        self.lm_head = nn.Linear(n_embd, vocab_size)
+
+    def forward(self, idx, targets=None):
+        B, T = idx.shape
+        tok_emb = self.token_embedding_table(idx) # (B, T, n_embd)
+        pos_emb = self.position_embedding_table(torch.arange(T, device=idx.device)) # (T, n_embd)
+        x = tok_emb + pos_emb # (B, T, n_embd)
+        x = self.blocks(x) # (B, T, n_embd)
+        x = self.ln_f(x) # (B, T, n_embd)
+        logits = self.lm_head(x) # (B, T, vocab_size)
+
+        if targets is None:
+            loss = None
+        else:
+            B, T, C = logits.shape
+            logits = logits.view(B*T, C)
+            targets = targets.view(B*T)
+            loss = F.cross_entropy(logits, targets)
+
+        return logits, loss
+
+    def generate(self, idx, max_new_tokens, temperature=0.7):
+        for _ in range(max_new_tokens):
+            idx_cond = idx[:, -self.block_size:]
+            logits, _ = self(idx_cond)
+            logits = logits[:, -1, :] # (B, C)
+            if temperature > 0:
+                logits = logits / temperature
+                probs = F.softmax(logits, dim=-1)
+                idx_next = torch.multinomial(probs, num_samples=1)
+            else:
+                idx_next = torch.argmax(logits, dim=-1, keepdim=True)
+            idx = torch.cat((idx, idx_next), dim=1)
+        return idx
+
+
+# ─────────────────────────────────────────────────────────────
+# Generative Engine Controller
+# ─────────────────────────────────────────────────────────────
 
 class GenerativeEngine:
     def __init__(self, workspace_path: str, model_key: str = None):
@@ -48,10 +136,10 @@ class GenerativeEngine:
         self.model_dir = Path(workspace_path) / ".ulolm"
         self.model_dir.mkdir(parents=True, exist_ok=True)
         self.model_key = model_key or self._load_selected_model() or DEFAULT_MODEL_KEY
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.model = None
 
     def _load_selected_model(self) -> str:
-        """Read the user's selected model from .ulolm/native_model.txt"""
         model_file = self.model_dir / "native_model.txt"
         if model_file.exists():
             key = model_file.read_text(encoding="utf-8").strip()
@@ -60,7 +148,6 @@ class GenerativeEngine:
         return ""
 
     def _save_selected_model(self, key: str):
-        """Persist the user's model choice."""
         model_file = self.model_dir / "native_model.txt"
         model_file.write_text(key, encoding="utf-8")
 
@@ -73,185 +160,151 @@ class GenerativeEngine:
         return self.model_info["file"]
 
     def set_model(self, key: str) -> tuple:
-        """Switch the active native model."""
         if key not in AVAILABLE_MODELS:
             return False, f"Unknown model '{key}'. Run /models to see available options."
         self.model_key = key
-        self.model = None  # Force reload on next generate
+        self.model = None
         self._save_selected_model(key)
         info = AVAILABLE_MODELS[key]
-        return True, f"Switched native model to {info['name']} ({info['ram']} RAM required)"
-
-    def _load_model(self, allow_download=False):
-        if not HAS_GPT4ALL:
-            return False, "gpt4all module is not installed."
-
-        model_path = self.model_dir / self.model_filename
-        if not model_path.exists() and not allow_download:
-            return False, f"Model {self.model_filename} not found. Run `/train_gen` to download it."
-
-        try:
-            self.model = GPT4All(
-                model_name=self.model_filename,
-                model_path=str(self.model_dir),
-                allow_download=allow_download
-            )
-            return True, "Model loaded successfully."
-        except Exception as e:
-            return False, f"Failed to load model: {e}"
-
-    def _fetch_download_url(self) -> tuple:
-        """Fetch the download URL and filesize for the current model from models3.json."""
-        import urllib.request
-        import json
-        
-        filename = self.model_filename
-        try:
-            req = urllib.request.Request(
-                "https://gpt4all.io/models/models3.json",
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-            )
-            with urllib.request.urlopen(req, timeout=10) as response:
-                data = json.loads(response.read().decode('utf-8'))
-                for model in data:
-                    if model.get("filename") == filename:
-                        url = model.get("url")
-                        size = int(model.get("filesize", 0)) if model.get("filesize") else None
-                        return url, size
-        except Exception:
-            pass
-            
-        # Fallback URL if models3.json lookup fails
-        fallback_url = f"https://gpt4all.io/models/gguf/{filename}"
-        return fallback_url, None
-
-    def download_model_file(self, progress_callback=None) -> tuple:
-        """Downloads the current model file with resume support and retries."""
-        import urllib.request
-        import time
-        
-        dest_path = self.model_dir / self.model_filename
-        if dest_path.exists():
-            return True, "Model file already exists."
-            
-        url, expected_size = self._fetch_download_url()
-        temp_path = dest_path.with_suffix(".part")
-        
-        retries = 5
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-        }
-        
-        for attempt in range(retries):
-            try:
-                downloaded = 0
-                if temp_path.exists():
-                    downloaded = temp_path.stat().st_size
-                    if expected_size and downloaded >= expected_size:
-                        try:
-                            temp_path.rename(dest_path)
-                            return True, "Model downloaded successfully."
-                        except Exception:
-                            pass
-                    headers["Range"] = f"bytes={downloaded}-"
-                
-                req = urllib.request.Request(url, headers=headers)
-                
-                try:
-                    response = urllib.request.urlopen(req, timeout=20)
-                    status_code = response.getcode()
-                except urllib.error.HTTPError as e:
-                    if e.code == 416:  # Range not satisfiable (might be fully downloaded)
-                        try:
-                            temp_path.rename(dest_path)
-                            return True, "Model downloaded successfully."
-                        except Exception:
-                            pass
-                        return True, "Model downloaded successfully."
-                    raise e
-                
-                # Check if resuming
-                is_resume = (status_code == 206)
-                if not is_resume:
-                    downloaded = 0
-                    write_mode = "wb"
-                else:
-                    write_mode = "ab"
-                    
-                total_size = expected_size
-                content_len = response.headers.get("Content-Length")
-                if content_len:
-                    if is_resume:
-                        total_size = downloaded + int(content_len)
-                    else:
-                        total_size = int(content_len)
-                
-                chunk_size = 1024 * 1024  # 1MB chunks
-                
-                # Create directory if not exists
-                self.model_dir.mkdir(parents=True, exist_ok=True)
-                
-                with open(temp_path, write_mode) as f:
-                    while True:
-                        chunk = response.read(chunk_size)
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        if progress_callback:
-                            try:
-                                progress_callback(downloaded, total_size)
-                            except Exception:
-                                pass
-                            
-                # Rename to final file
-                if temp_path.exists():
-                    temp_path.rename(dest_path)
-                return True, "Model downloaded successfully."
-                
-            except (ConnectionResetError, ConnectionAbortedError, urllib.error.URLError, TimeoutError, OSError) as e:
-                if attempt == retries - 1:
-                    return False, f"Failed after {retries} attempts. Last error: {e}"
-                time.sleep(2 ** attempt)  # Backoff: 1s, 2s, 4s, 8s...
-                
-        return False, "Failed to download model due to connection issues."
+        return True, f"Switched native model to {info['name']}"
 
     def train_on_workspace(self, progress_callback=None):
-        """Downloads the selected native model and loads it."""
-        success, msg = self.download_model_file(progress_callback=progress_callback)
-        if not success:
-            return False, msg
-            
-        success, msg = self._load_model(allow_download=False)
-        if success:
-            self._save_selected_model(self.model_key)
-            info = self.model_info
-            return True, f"Successfully initialized {info['name']} ({info['ram']} RAM) — model cached locally."
+        """Trains the custom Tiny GPT from scratch on data.md and files in the workspace."""
+        # Find training corpus
+        corpus_path = Path(self.workspace_path) / "data.md"
+        text = ""
+        if corpus_path.exists():
+            text = corpus_path.read_text(encoding="utf-8")
         else:
-            return False, msg
+            # Fallback scan of workspace files to gather training data
+            for file in Path(self.workspace_path).rglob("*.py"):
+                if ".venv" not in str(file) and ".ulolm" not in str(file):
+                    try:
+                        text += file.read_text(encoding="utf-8") + "\n"
+                    except Exception:
+                        pass
+        
+        if not text.strip():
+            return False, "No training data found in data.md or workspace!"
 
-    def generate(self, prompt: str, length: int = 500, temperature: float = 0.3, system_context: str = "") -> str:
-        """Generates text natively using the GPT4All model with optional system context."""
-        if not HAS_GPT4ALL:
-            return "GPT4All is not installed! Please ensure the dependencies are installed."
+        # Character-level tokenization
+        chars = sorted(list(set(text)))
+        vocab_size = len(chars)
+        
+        # Save vocabulary mapping
+        vocab_data = {"chars": chars}
+        vocab_file = self.model_dir / "vocab.json"
+        vocab_file.write_text(json.dumps(vocab_data), encoding="utf-8")
 
-        if self.model is None:
-            success, msg = self._load_model(allow_download=False)
-            if not success:
-                return "Native model not found! Please run `/train_gen` first to download it."
+        stoi = {ch: i for i, ch in enumerate(chars)}
+        data = torch.tensor([stoi[c] for c in text], dtype=torch.long)
+
+        # Split into training and validation sets
+        n = int(0.9 * len(data))
+        train_data = data[:n]
+        val_data = data[n:]
+
+        # Hyperparameters
+        batch_size = 32
+        block_size = 64
+        max_iters = 1000
+        eval_interval = 100
+        device = self.device
+
+        # Get batch helper
+        def get_batch(split):
+            d = train_data if split == 'train' else val_data
+            if len(d) <= block_size:
+                # Pad if data is too small
+                ix = torch.zeros((batch_size,), dtype=torch.long)
+            else:
+                ix = torch.randint(len(d) - block_size, (batch_size,))
+            x = torch.stack([d[i:i+block_size] if len(d) > block_size else torch.zeros(block_size, dtype=torch.long) for i in ix])
+            y = torch.stack([d[i+1:i+block_size+1] if len(d) > block_size else torch.zeros(block_size, dtype=torch.long) for i in ix])
+            x, y = x.to(device), y.to(device)
+            return x, y
+
+        @torch.no_grad()
+        def estimate_loss(model):
+            out = {}
+            model.eval()
+            for split in ['train', 'val']:
+                losses = torch.zeros(10)
+                for k in range(10):
+                    X, Y = get_batch(split)
+                    _, loss = model(X, Y)
+                    losses[k] = loss.item()
+                out[split] = losses.mean().item()
+            model.train()
+            return out
+
+        model = TinyGPT(vocab_size=vocab_size, block_size=block_size).to(device)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+
+        print("Beginning Tiny GPT training...")
+        for iter in range(max_iters):
+            if iter % eval_interval == 0 or iter == max_iters - 1:
+                losses = estimate_loss(model)
+                if progress_callback:
+                    try:
+                        progress_callback(iter, max_iters, losses['train'], losses['val'])
+                    except Exception:
+                        pass
+
+            xb, yb = get_batch('train')
+            logits, loss = model(xb, yb)
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            optimizer.step()
+
+        # Save model weights
+        model_path = self.model_dir / self.model_filename
+        torch.save(model.state_dict(), model_path)
+        self.model = model
+        
+        return True, f"Successfully trained UloLlama custom GPT model over {max_iters} steps!"
+
+    def generate(self, prompt: str, length: int = 200, temperature: float = 0.7, system_context: str = "") -> str:
+        """Generates text using the trained custom Tiny GPT model."""
+        vocab_file = self.model_dir / "vocab.json"
+        model_path = self.model_dir / self.model_filename
+
+        if not vocab_file.exists() or not model_path.exists():
+            return "UloLlama model weights or vocab not found! Please run `/train_gen` first to train the model."
 
         try:
-            if system_context:
-                system_prompt = system_context
-            else:
-                system_prompt = "You are UloLM, a highly capable native AI running entirely locally. Be extremely helpful and concise."
+            # Load vocab
+            vocab_data = json.loads(vocab_file.read_text(encoding="utf-8"))
+            chars = vocab_data["chars"]
+            vocab_size = len(chars)
+            stoi = {ch: i for i, ch in enumerate(chars)}
+            itos = {i: ch for i, ch in enumerate(chars)}
+            
+            # Load model
+            if self.model is None:
+                self.model = TinyGPT(vocab_size=vocab_size).to(self.device)
+                self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+            self.model.eval()
 
-            with self.model.chat_session(system_prompt=system_prompt):
-                response = self.model.generate(
-                    prompt,
-                    max_tokens=length,
-                    temp=temperature
-                )
+            # Encode prompt
+            encoded_prompt = []
+            for c in prompt:
+                if c in stoi:
+                    encoded_prompt.append(stoi[c])
+            if not encoded_prompt:
+                encoded_prompt = [0]
+            
+            context_tensor = torch.tensor([encoded_prompt], dtype=torch.long, device=self.device)
+            
+            # Generate
+            with torch.no_grad():
+                generated_tokens = self.model.generate(context_tensor, max_new_tokens=length, temperature=temperature)
+                
+            # Decode response
+            generated_list = generated_tokens[0].tolist()
+            # Return only the newly generated text part
+            new_tokens = generated_list[len(encoded_prompt):]
+            response = "".join(itos[t] for t in new_tokens)
             return response.strip()
         except Exception as e:
-            return f"Error during native generation: {e}"
+            return f"Error during custom GPT generation: {e}"

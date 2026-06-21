@@ -17,7 +17,41 @@ class ModelEngine:
         self.config = config
 
     def query(self, prompt: str, system_context: str = "") -> ModelResponse:
+        import re
         backend = self.config.backend.lower()
+        
+        # Check for web scraping/search intent
+        p_low = prompt.lower()
+        web_context = ""
+        
+        # 1. Direct Scrape Intent
+        url_match = re.search(r'https?://[^\s]+', prompt)
+        if "scrape" in p_low and url_match:
+            url = url_match.group(0)
+            from ulolm.scraper import WebScraper
+            scraped_content = WebScraper.scrape_url(url)
+            web_context = f"\n\nSCRAPED CONTENT FROM {url}:\n{scraped_content}"
+            
+        # 2. Web Search Intent
+        elif "search" in p_low or "look up" in p_low:
+            search_query = prompt
+            for word in ["search for", "search", "look up"]:
+                if p_low.startswith(word):
+                    search_query = prompt[len(word):].strip()
+                    break
+            
+            from ulolm.scraper import WebScraper
+            search_results = WebScraper.search(search_query)
+            if search_results:
+                results_str = "\n".join([
+                    f"- Title: {r['title']}\n  Snippet: {r['snippet']}\n  URL: {r['url']}"
+                    for r in search_results
+                ])
+                web_context = f"\n\nWEB SEARCH RESULTS FOR '{search_query}':\n{results_str}"
+                
+        if web_context:
+            system_context = f"{system_context}\n\n{web_context}"
+
         if backend == "ollama":
             return self._query_ollama(prompt, system_context)
         elif backend == "openai":

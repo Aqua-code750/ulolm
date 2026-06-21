@@ -281,3 +281,42 @@ A: To multiply matrices A (m×n) and B (n×p), each element C[i][j] in the resul
 
 ### Q: What is gradient descent?
 A: Gradient descent is an optimization algorithm that iteratively adjusts parameters to minimize a loss function. At each step, it computes the gradient (direction of steepest ascent) and moves in the opposite direction, scaled by the learning rate. Variants include stochastic gradient descent (SGD), Adam, and RMSProp.
+
+---
+
+## Web Scraping & Scraping Techniques
+
+### Q: What is web scraping?
+A: Web scraping is the automated extraction of data from web pages. A scraper sends an HTTP request to a target URL, receives the HTML code, and parses it to extract specific information. It is crucial to respect robots.txt rules, avoid aggressive request rates, and handle errors gracefully.
+
+### Q: How do you parse HTML content without external dependencies?
+A: In Python, you can use the built-in `html.parser.HTMLParser` class to extract data from HTML tags. By subclassing `HTMLParser` and overriding methods like `handle_starttag`, `handle_endtag`, and `handle_data`, you can filter out script or style tags and cleanly extract visible text content.
+
+### Q: Explain how DuckDuckGo HTML search can be queried programmatically.
+A: You can query the HTML-only version of DuckDuckGo by making a request to `https://html.duckduckgo.com/html/?q=query`. By sending a standard User-Agent header (like Mozilla/5.0) and parsing the returned HTML for result elements (such as `result__snippet` and `result__url`), you can extract search snippets and links.
+
+---
+
+## Research & Machine Learning
+
+### Q: What is a Transformer model?
+A: A Transformer is a neural network architecture that relies entirely on self-attention mechanisms to compute representations of its input and output without using sequence-aligned RNNs or convolution. It was introduced in the paper "Attention Is All You Need" and forms the foundation of modern Large Language Models.
+
+### Q: Explain the Self-Attention mechanism.
+A: Self-attention allows a model to associate each word (or token) in a sequence with all other words in the same sequence. It computes three vectors for each input token: Query (Q), Key (K), and Value (V). The attention score is computed as `Softmax(Q @ K.T / sqrt(d_k)) @ V`, determining how much focus to place on other parts of the sequence.
+
+### Q: What is the purpose of Positional Embeddings in Transformers?
+A: Since Transformers process all tokens in a sequence concurrently (unlike RNNs which process sequentially), they have no inherent sense of token order. Positional Embeddings are added to token embeddings to provide the model with information about the position of each token in the sequence.
+
+---
+
+## Conversational Dialogs
+
+### Q: Hello, how can you help me today?
+A: Hello! I am UloLM, your local AI assistant. I am ready to help you write code, search the web, scrape information from URLs, perform calculations, or research any technical topics directly inside your workspace!
+
+### Q: Can you search the web for me?
+A: Yes! If you type a query starting with "search" or "look up" (e.g., "search latest Python releases"), I will query the web, extract the top search results, and use that context to answer your question.
+
+### Q: How do I train my own custom model here?
+A: You can train your local custom model (UloLlama) from scratch on your workspace data and data.md by typing `/train_gen` in the UloLM CLI. It will initialize a local training loop and output the training loss in real-time.

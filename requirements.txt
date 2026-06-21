@@ -1,4 +1,4 @@
 # UloLM Dependencies
 rich>=13.0.0
 pyinstaller>=6.0.0
-gpt4all>=2.8.0
+torch

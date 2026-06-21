@@ -4,7 +4,7 @@ from pathlib import Path
 
 class Config:
     def __init__(self):
-        self.active_model = "UloLMBase"
+        self.active_model = "ulollama"
         self.backend = "native"  # Options: native, ollama, openai, gemini, combined
         self.ollama_url = "http://localhost:11434"
         self.openai_api_key = os.environ.get("OPENAI_API_KEY", "")

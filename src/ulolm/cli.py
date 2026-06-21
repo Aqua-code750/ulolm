@@ -139,25 +139,25 @@ def main():
             model_name = gen_engine.model_info['name']
             
             if HAS_RICH:
-                from rich.progress import Progress, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn, TextColumn
+                from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
                 
                 progress = Progress(
                     TextColumn("[bold cyan]{task.description}"),
                     BarColumn(),
-                    DownloadColumn(),
-                    TransferSpeedColumn(),
-                    TimeRemainingColumn(),
+                    TimeElapsedColumn(),
                     transient=True
                 )
                 
                 with progress:
-                    task = progress.add_task(f"Downloading {model_name}...", total=None)
+                    task = progress.add_task(f"Training {model_name}...", total=1000)
                     
-                    def cb(downloaded, total):
-                        if total:
-                            progress.update(task, completed=downloaded, total=total)
-                        else:
-                            progress.update(task, completed=downloaded)
+                    def cb(step, total_steps, train_loss, val_loss):
+                        progress.update(
+                            task,
+                            completed=step,
+                            total=total_steps,
+                            description=f"Training {model_name} [step {step}/{total_steps} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}]"
+                        )
                             
                     success, msg = gen_engine.train_on_workspace(progress_callback=cb)
                 
@@ -166,19 +166,10 @@ def main():
                 else:
                     console.print(f"[bold red]✖ {msg}[/bold red]")
             else:
-                print(f"Downloading {model_name}...")
-                last_pct = -1
+                print(f"Training {model_name}...")
                 
-                def cb(downloaded, total):
-                    nonlocal last_pct
-                    if total:
-                        pct = int((downloaded / total) * 100)
-                        if pct % 5 == 0 and pct != last_pct:
-                            print(f"Progress: {pct}% ({downloaded // (1024*1024)}MB / {total // (1024*1024)}MB)")
-                            last_pct = pct
-                    else:
-                        if downloaded % (10 * 1024 * 1024) == 0:
-                            print(f"Downloaded: {downloaded // (1024*1024)}MB")
+                def cb(step, total_steps, train_loss, val_loss):
+                    print(f"Step {step}/{total_steps} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
                             
                 success, msg = gen_engine.train_on_workspace(progress_callback=cb)
                 print(f"{'✔' if success else '✖'} {msg}")
